@@ -70,28 +70,25 @@ func (s UserSlice) Len() int           { return len(s) }
 func (s UserSlice) Less(i, j int) bool { return *s[i].Login < *s[j].Login }
 func (s UserSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
-func listCommits(ctx context.Context, client *github.Client, cfg *Config) ([]string, []string, error) {
+func listCommits(ctx context.Context, client *github.Client, cfg *Config) ([]*github.User, error) {
 	opt := &github.CommitsListOptions{
 		ListOptions: github.ListOptions{PerPage: 100},
 	}
 
 	var (
-		users = make(map[string][]string)
+		users = make(map[*int]*github.User)
 	)
 	for {
 		commits, resp, err := client.Repositories.ListCommits(ctx, cfg.Owner, cfg.Repo, opt)
 		if err != nil {
-			return nil, nil, errors.Trace(err)
+			return nil, errors.Trace(err)
 		}
 
 		for _, commit := range commits {
-			user := *commit.Commit.Author.Name
-			t := unifyDate(*commit.Commit.Author.Date)
-			value, ok := users[user]
-			if ok {
-				users[user] = append(value, t)
-			} else {
-				users[user] = []string{t}
+			user := *commit.Author
+			_, ok := users[user.ID]
+			if !ok {
+				users[user.ID] = &user
 			}
 		}
 
@@ -103,16 +100,14 @@ func listCommits(ctx context.Context, client *github.Client, cfg *Config) ([]str
 	}
 
 	var (
-		userNames []string
-		times     []string
+		gUser []*github.User
 	)
-	for name, value := range users {
-		userNames = append(userNames, name)
-		sort.Strings(value)
-		times = append(times, value[0])
+
+	for _, user := range users {
+		gUser = append(gUser, user)
 	}
 
-	return userNames, times, nil
+	return gUser, nil
 }
 
 func listForkers(ctx context.Context, client *github.Client, cfg *Config) ([]*github.User, []time.Time, error) {
@@ -387,17 +382,16 @@ func printUsers(owner string, repo string, users []*github.User, times []time.Ti
 	log.Infof("[users]\n%s", string(content))
 }
 
-func printUserNames(owner string, repo string, users []string, times []string) {
+func printUserNames(owner string, repo string, users []*github.User) {
 	var content []byte
-	for i, user := range users {
+	for _, user := range users {
 		if len(owner) > 0 && len(repo) > 0 {
 			content = append(content, []byte(fmt.Sprintf("%s/%s", owner, repo))...)
 			content = append(content, '\t')
 		}
-
-		content = append(content, []byte(unifyStr(&user))...)
+		content = append(content, []byte(unifyInt(user.ID))...)
 		content = append(content, '\t')
-		content = append(content, []byte(times[i])...)
+		content = append(content, []byte(unifyStr(user.Email))...)
 		content = append(content, '\n')
 	}
 

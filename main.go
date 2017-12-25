@@ -19,7 +19,6 @@ import (
 	"os"
 	"strings"
 
-	"fmt"
 	"github.com/juju/errors"
 	"github.com/ngaut/log"
 )
@@ -38,12 +37,12 @@ func do(cfg *Config) {
 			log.Fatal("empty repo")
 		}
 
-		users, times, err := listCommits(ctx, client, cfg)
+		users, err := listCommits(ctx, client, cfg)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		printUserNames(cfg.Owner, cfg.Repo, users, times)
+		printUserNames(cfg.Owner, cfg.Repo, users)
 	case "forkers":
 		if len(cfg.Owner) == 0 {
 			log.Fatal("empty owner")
